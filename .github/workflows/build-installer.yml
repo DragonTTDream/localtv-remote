@@ -47,6 +47,29 @@ jobs:
         run: dir release
         shell: cmd
 
+      # 让产物自证身份：版本号相同的两个包无法区分，所以把源码指纹写进资产。
+      - name: Write BUILD-INFO (proves which source went in)
+        shell: bash
+        run: |
+          {
+            echo "tag=${{ github.event.inputs.tag }}"
+            echo "commit=$(git rev-parse HEAD)"
+            echo "package_version=$(node -p \"require('./package.json').version\")"
+            echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo "[sha256]"
+            sha256sum public/control/controller.js peer 2>/dev/null || sha256sum public/control/controller.js
+            sha256sum public/control/index.html
+            sha256sum public/control/controller.css
+            echo ""
+            echo "[left-click fix marker] pointerLockElement !== trackpad"
+            grep -c "pointerLockElement !== trackpad" public/control/controller.js
+            echo "[volume slider marker] volume-track"
+            grep -c "volume-track" public/control/controller.js
+            grep -c "volume-track" public/control/index.html
+          } > release/BUILD-INFO.txt
+          cat release/BUILD-INFO.txt
+
       - name: Attach installer to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -57,9 +80,16 @@ jobs:
             **Personal, unofficial fork build / 个人自用魔改版**
 
             Desktop-browser improvements over upstream: pointer capture (Pointer Lock),
-            right-click (button 2) and middle-click (button 1), plus fallback buttons.
+            right-click (button 2) and middle-click (button 1), plus fallback buttons —
+            and since v0.1.1-desktop.3 a fix for left-click being dead while pointer-locked,
+            plus a draggable volume slider.
+
+            `BUILD-INFO.txt` lists the source commit and the sha256 of the packaged UI files,
+            so you can tell two builds apart.
 
             Not affiliated with, endorsed by, or merged into upstream; no support provided.
             Windows 10/11 · unsigned (SmartScreen "unknown publisher" 提示属正常，点 More info → Run anyway)。
-          files: release/*.exe
+          files: |
+            release/*.exe
+            release/BUILD-INFO.txt
           fail_on_unmatched_files: true
