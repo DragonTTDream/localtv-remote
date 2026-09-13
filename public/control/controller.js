@@ -666,7 +666,13 @@ if (trackpad) {
     }
     if (e.button !== 0) return;
     e.preventDefault();
-    trackpad.setPointerCapture(e.pointerId);
+    /* Pointer lock 激活时 setPointerCapture 会抛 InvalidStateError，异常会打断本处理器，
+       导致 pointerDragging/singleTapCandidate 没被赋值 → pointerup 判断不成立 → 左键彻底失灵。
+       （实测证据：无头 Chrome 断言 J + pageerror InvalidStateError）
+       锁定态本来就是无限相对位移，不需要 pointer capture，因此直接跳过。 */
+    if (document.pointerLockElement !== trackpad) {
+      try { trackpad.setPointerCapture(e.pointerId); } catch (err) { /* 捕获失败不影响点击 */ }
+    }
     pointerDragging = true;
     pointerLast = { x: e.clientX, y: e.clientY };
     singleTapCandidate = { x: e.clientX, y: e.clientY, time: performance.now() };
