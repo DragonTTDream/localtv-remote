@@ -135,6 +135,7 @@ const trackpad = document.getElementById('trackpad');
 const lockBtn = document.getElementById('btn-lock');
 const rightClickBtn = document.getElementById('btn-right-click');
 const middleClickBtn = document.getElementById('btn-middle-click');
+const leftDragBtn = document.getElementById('btn-left-drag');
 const muteToggle = document.getElementById('mute-toggle');
 const settingsBtn = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
@@ -232,6 +233,22 @@ let twoFingerScrollUsed = false;
 let twoFingerTapStartTime = 0;
 let pointerDragging = false;
 let pointerLast = null;
+let pressActive = false;      // 左键本次按下是否仍在持续
+let pressDragActive = false;  // 是否已发出 MOUSE_DOWN（= 正在拖拽）
+let pressAccumPx = 0;         // 自按下以来累计位移（px），用于判定「是点击还是拖拽」
+let stickyLeft = false;       // 触摸端的粘滞左键
+
+/* 累计「按下后的位移」：超过 TAP_MOVE_PX 就认为用户要拖拽，
+   于是补发 MOUSE_DOWN，后续位移帧就会被主机当成按住拖动。
+   桌面（未捕获/已捕获）与触摸路径都调它。 */
+const notePressMovement = (px) => {
+  if (!pressActive || pressDragActive || !(px > 0)) return;
+  pressAccumPx += px;
+  if (pressAccumPx > TAP_MOVE_PX) {
+    pressDragActive = true;
+    sendMouseButton(true, 'left');
+  }
+};
 let currentVolume = 0;
 let isMuted = false;
 let hasVolumeState = false;
@@ -396,6 +413,21 @@ const sendClick = (button) => {
   clickView.setFloat32(2, lastPointerNorm.x, true);
   clickView.setFloat32(6, lastPointerNorm.y, true);
   sendBinary(clickBuffer);
+};
+
+/* 按下 / 抬起帧（BINARY_TAG.MOUSE_DOWN 0x03 / MOUSE_UP 0x04，与 CLICK 同为 10 字节）。
+   协议里 CLICK 等于 down+up 连发（见 src/daemon/system-input-router.ts 的 'click' 分支），
+   但要支持「拖动/框选」必须能把 down 与 up 分开：路由在收到 down 时按当前光标位置按下，
+   于是 down + 一串位移 + up 就是一次真实的拖拽。 */
+const buttonBuffer = new ArrayBuffer(10);
+const buttonView = new DataView(buttonBuffer);
+
+const sendMouseButton = (isDown, button = 'left') => {
+  buttonView.setUint8(0, isDown ? BINARY_TAG.MOUSE_DOWN : BINARY_TAG.MOUSE_UP);
+  buttonView.setUint8(1, BUTTON_INDEX[button] ?? 0);
+  buttonView.setFloat32(2, lastPointerNorm.x, true);
+  buttonView.setFloat32(6, lastPointerNorm.y, true);
+  sendBinary(buttonBuffer);
 };
 
 const flashTrackpad = () => {
@@ -666,8 +698,11 @@ if (trackpad) {
     if (remaining === 0) {
       const now = performance.now();
       if (gestureMaxFingers === 1 && singleTapCandidate && now - singleTapCandidate.time <= TAP_TIME_MS) {
-        sendClick('left');
-        flashTrackpad();
+        /* 粘滞左键按住时，轻点不再发 click（否则会提前把左键松开） */
+        if (!stickyLeft) {
+          sendClick('left');
+          flashTrackpad();
+        }
       } else if (gestureMaxFingers === 2 && !twoFingerScrollUsed && now - twoFingerTapStartTime <= TWO_FINGER_TAP_TIME_MS) {
         sendClick('right');
         flashTrackpad();
@@ -713,6 +748,9 @@ if (trackpad) {
       try { trackpad.setPointerCapture(e.pointerId); } catch (err) { /* 捕获失败不影响点击 */ }
     }
     pointerDragging = true;
+    pressActive = true;
+    pressDragActive = false;
+    pressAccumPx = 0;
     pointerLast = { x: e.clientX, y: e.clientY };
     singleTapCandidate = { x: e.clientX, y: e.clientY, time: performance.now() };
   });
@@ -724,9 +762,11 @@ if (trackpad) {
     if (document.pointerLockElement === trackpad) return;
     if (!pointerDragging || e.pointerType !== 'mouse' || !pointerLast) return;
     const bounds = trackpad.getBoundingClientRect();
+    const stepPx = Math.hypot(e.clientX - pointerLast.x, e.clientY - pointerLast.y);
     const dx = (e.clientX - pointerLast.x) / bounds.width;
     const dy = (e.clientY - pointerLast.y) / bounds.height;
     pointerLast = { x: e.clientX, y: e.clientY };
+    notePressMovement(stepPx);
     if (singleTapCandidate && distancePx(singleTapCandidate, pointerLast) > TAP_MOVE_PX) singleTapCandidate = null;
     lastPointerNorm.x = Math.min(1, Math.max(0, lastPointerNorm.x + dx * mouseDeltaSensitivity));
     lastPointerNorm.y = Math.min(1, Math.max(0, lastPointerNorm.y + dy * mouseDeltaSensitivity));
@@ -737,14 +777,29 @@ if (trackpad) {
     if (e.pointerType !== 'mouse') return;
     pointerDragging = false;
     pointerLast = null;
-    if (e.button === 0 && singleTapCandidate && performance.now() - singleTapCandidate.time <= TAP_TIME_MS) {
+    if (e.button === 0 && pressDragActive) {
+      /* 拖动结束：抬起左键，主机侧完成这次框选/拖拽 */
+      sendMouseButton(false, 'left');
+      flashTrackpad();
+    } else if (e.button === 0 && singleTapCandidate && performance.now() - singleTapCandidate.time <= TAP_TIME_MS) {
       sendClick('left');
       flashTrackpad();
     }
+    pressActive = false;
+    pressDragActive = false;
+    pressAccumPx = 0;
     singleTapCandidate = null;
   });
 
-  trackpad.addEventListener('pointercancel', () => { pointerDragging = false; pointerLast = null; singleTapCandidate = null; });
+  trackpad.addEventListener('pointercancel', () => {
+    if (pressDragActive) sendMouseButton(false, 'left');
+    pointerDragging = false;
+    pointerLast = null;
+    singleTapCandidate = null;
+    pressActive = false;
+    pressDragActive = false;
+    pressAccumPx = 0;
+  });
 
   trackpad.addEventListener('wheel', (e) => { e.preventDefault(); queueScroll(e.deltaY); }, { passive: false });
 
@@ -790,6 +845,7 @@ if (trackpad) {
     const dx = e.movementX / bounds.width;
     const dy = e.movementY / bounds.height;
     if (!dx && !dy) return;
+    notePressMovement(Math.hypot(e.movementX, e.movementY));
     lastPointerNorm.x = Math.min(1, Math.max(0, lastPointerNorm.x + dx * mouseDeltaSensitivity));
     lastPointerNorm.y = Math.min(1, Math.max(0, lastPointerNorm.y + dy * mouseDeltaSensitivity));
     queueMouseDelta(dx, dy);
@@ -798,6 +854,20 @@ if (trackpad) {
   /* Desktop fallback buttons — usable without the pointer-lock capture. */
   rightClickBtn?.addEventListener('click', (e) => { e.preventDefault(); sendClick('right'); flashTrackpad(); });
   middleClickBtn?.addEventListener('click', (e) => { e.preventDefault(); sendClick('middle'); flashTrackpad(); });
+
+  /* 粘滞左键（触摸端主力用法）：点一下 = 按住左键，再点一下 = 松开。
+     按住期间在触控板上用另一根手指拖动，主机侧就是拖拽/框选。 */
+  const setStickyLeft = (on) => {
+    if (stickyLeft === on) return;
+    stickyLeft = on;
+    sendMouseButton(on, 'left');
+    if (leftDragBtn) {
+      leftDragBtn.classList.toggle('trackpad-tool--active', on);
+      leftDragBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      leftDragBtn.textContent = on ? 'Left held' : 'Hold left';
+    }
+  };
+  leftDragBtn?.addEventListener('click', (e) => { e.preventDefault(); setStickyLeft(!stickyLeft); });
 }
 
 /* ── Control buttons ── */

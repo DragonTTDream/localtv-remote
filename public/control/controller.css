@@ -445,8 +445,9 @@ button, input { font: inherit; color: inherit; touch-action: manipulation; }
 .trackpad:active .trackpad__hint { opacity: 0; }
 
 /* Desktop-only trackpad tools: pointer capture + right/middle click.
-   Touch devices keep the gesture paths (two-finger tap / two-finger scroll),
-   so the row stays hidden there and the phone layout is unchanged. */
+   Touch devices keep the gesture paths (two-finger tap / two-finger scroll)
+   and additionally get the sticky "Hold left" button for drag/box-select;
+   only "Capture pointer" is hidden there (there is no cursor to capture). */
 .trackpad-tools {
   display: flex;
   gap: 6px;
@@ -481,7 +482,7 @@ button, input { font: inherit; color: inherit; touch-action: manipulation; }
 }
 
 @media (hover: none) and (pointer: coarse) {
-  .trackpad-tools { display: none; }
+  #btn-lock { display: none; }
 }
 
 

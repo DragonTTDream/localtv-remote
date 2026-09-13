@@ -121,12 +121,14 @@
           <!-- ─── Panel: Remote ─── -->
           <section class="panel" id="panel-remote" data-panel="remote">
             <div class="trackpad-wrap">
-              <div class="trackpad" id="trackpad">
-                <span class="trackpad__hint">Swipe to move cursor</span>
-              </div>
-              <!-- Desktop-only tools: pointer capture + right/middle click.
-                   Hidden on touch devices (they keep the gesture paths). -->
+              <!-- Tools row moved above the trackpad so the drag area stays clear.
+                   Shown on every device; only "Capture pointer" is hidden on coarse
+                   pointers (no cursor to capture there). -->
               <div class="trackpad-tools" id="trackpad-tools">
+                <button class="trackpad-tool" id="btn-left-drag" type="button"
+                        aria-pressed="false" title="Hold the left mouse button; then drag on the trackpad (touch: hold this, drag with another finger)">
+                  Hold left
+                </button>
                 <button class="trackpad-tool trackpad-tool--lock" id="btn-lock" type="button"
                         aria-pressed="false" title="Capture the mouse pointer for relative movement (Esc to release)">
                   Capture pointer
@@ -137,6 +139,9 @@
                 <button class="trackpad-tool" id="btn-middle-click" type="button" title="Send a middle click">
                   Middle click
                 </button>
+              </div>
+              <div class="trackpad" id="trackpad">
+                <span class="trackpad__hint">Swipe to move cursor</span>
               </div>
             </div>
             <div class="ctrl-row">
