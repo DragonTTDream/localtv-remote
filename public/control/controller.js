@@ -478,6 +478,45 @@ volUp?.addEventListener('pointerdown', (e) => { e.preventDefault(); startVolumeR
 window.addEventListener('pointerup', stopVolumeRepeat);
 window.addEventListener('pointercancel', stopVolumeRepeat);
 
+/* ── Volume slider: draggable track ──
+   复用现成的绝对音量通道 sendMessage({type:'volume_set', percent})；
+   协议侧已夹取 0–100（src/core/main/input/message-parser.ts:116）。 */
+let volumeTrackDragging = false;
+const volTrack = document.getElementById('volume-track');
+
+const setVolumeFromPointer = (clientX) => {
+  if (!volTrack) return;
+  const bounds = volTrack.getBoundingClientRect();
+  if (!bounds.width) return;
+  const frac = Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width));
+  const percent = Math.round(frac * 100);
+  hasVolumeState = true;
+  currentVolume = percent;
+  updateVolumeUI();
+  pendingVolumeTarget = percent;
+  if (!volumeSendTimer) volumeSendTimer = setTimeout(flushVolumeTarget, 120);
+};
+
+if (volTrack) {
+  volTrack.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    try { volTrack.setPointerCapture(e.pointerId); } catch (err) { /* 捕获失败不影响拖动 */ }
+    volumeTrackDragging = true;
+    setVolumeFromPointer(e.clientX);
+  });
+  volTrack.addEventListener('pointermove', (e) => {
+    if (!volumeTrackDragging) return;
+    setVolumeFromPointer(e.clientX);
+  });
+  volTrack.addEventListener('pointerup', (e) => {
+    if (!volumeTrackDragging) return;
+    volumeTrackDragging = false;
+    setVolumeFromPointer(e.clientX);
+  });
+  volTrack.addEventListener('pointercancel', () => { volumeTrackDragging = false; });
+}
+
+
 updateVolumeUI();
 
 /* ── WebSocket connection ── */
