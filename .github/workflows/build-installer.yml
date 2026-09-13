@@ -1,0 +1,65 @@
+name: Build Windows installer (personal fork)
+
+# 个人自用魔改版：在 GitHub 的 Windows runner 上打包安装包并挂到 Release。
+# 本机是 Linux，无法产出 Windows 安装包（build-sea 用 rcedit 改 PE，build-installer 用 Inno Setup ISCC）。
+#
+# 手动触发：Actions → Build Windows installer → Run workflow → 填 tag。
+# 例：gh workflow run build-installer.yml -f tag=v0.1.1-desktop.2
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要构建并挂产物的 tag/ref（如 v0.1.1-desktop.2）'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build dist (typecheck + bundle + SEA exe + payload)
+        run: npm run dist
+
+      - name: Compile installer
+        run: npm run installer
+
+      - name: List release artifacts
+        run: dir release
+        shell: cmd
+
+      - name: Attach installer to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.tag }} — personal fork build
+          prerelease: true
+          body: |
+            **Personal, unofficial fork build / 个人自用魔改版**
+
+            Desktop-browser improvements over upstream: pointer capture (Pointer Lock),
+            right-click (button 2) and middle-click (button 1), plus fallback buttons.
+
+            Not affiliated with, endorsed by, or merged into upstream; no support provided.
+            Windows 10/11 · unsigned (SmartScreen "unknown publisher" 提示属正常，点 More info → Run anyway)。
+          files: release/*.exe
+          fail_on_unmatched_files: true
