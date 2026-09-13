@@ -54,19 +54,18 @@ jobs:
           {
             echo "tag=${{ github.event.inputs.tag }}"
             echo "commit=$(git rev-parse HEAD)"
-            echo "package_version=$(node -p \"require('./package.json').version\")"
             echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo ""
+            echo
             echo "[sha256]"
-            sha256sum public/control/controller.js peer 2>/dev/null || sha256sum public/control/controller.js
+            sha256sum public/control/controller.js
             sha256sum public/control/index.html
             sha256sum public/control/controller.css
-            echo ""
-            echo "[left-click fix marker] pointerLockElement !== trackpad"
-            grep -c "pointerLockElement !== trackpad" public/control/controller.js
-            echo "[volume slider marker] volume-track"
-            grep -c "volume-track" public/control/controller.js
-            grep -c "volume-track" public/control/index.html
+            echo
+            echo "[left-click fix marker: pointerLockElement !== trackpad]"
+            grep -c 'pointerLockElement !== trackpad' public/control/controller.js
+            echo "[volume slider marker: volume-track]"
+            grep -c 'volume-track' public/control/controller.js
+            grep -c 'volume-track' public/control/index.html
           } > release/BUILD-INFO.txt
           cat release/BUILD-INFO.txt
 
