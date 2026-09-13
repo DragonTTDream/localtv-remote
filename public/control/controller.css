@@ -340,6 +340,7 @@ button, input { font: inherit; color: inherit; touch-action: manipulation; }
   flex: 1 1 auto;
   min-height: 110px;
   display: flex;
+  flex-direction: column;
 }
 
 #panel-remote .trackpad {
@@ -442,6 +443,46 @@ button, input { font: inherit; color: inherit; touch-action: manipulation; }
 }
 
 .trackpad:active .trackpad__hint { opacity: 0; }
+
+/* Desktop-only trackpad tools: pointer capture + right/middle click.
+   Touch devices keep the gesture paths (two-finger tap / two-finger scroll),
+   so the row stays hidden there and the phone layout is unchanged. */
+.trackpad-tools {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 6px 2px 0;
+}
+
+.trackpad-tool {
+  flex: 1 1 auto;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 150ms ease, background 150ms ease, border-color 150ms ease;
+}
+
+.trackpad-tool:hover { color: var(--text); }
+.trackpad-tool:active { background: rgba(255, 255, 255, 0.08); }
+
+.trackpad-tool--active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(10, 132, 255, 0.14);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .trackpad-tools { display: none; }
+}
 
 
 /* ────────────────────────────────────────

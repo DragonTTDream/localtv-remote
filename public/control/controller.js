@@ -132,6 +132,9 @@ const connDot = document.getElementById('conn-dot');
 const connLabel = document.getElementById('conn-label');
 const headerDot = document.getElementById('header-dot');
 const trackpad = document.getElementById('trackpad');
+const lockBtn = document.getElementById('btn-lock');
+const rightClickBtn = document.getElementById('btn-right-click');
+const middleClickBtn = document.getElementById('btn-middle-click');
 const muteToggle = document.getElementById('mute-toggle');
 const settingsBtn = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
@@ -646,7 +649,22 @@ if (trackpad) {
 
   /* Trackpad: mouse pointer (desktop testing) */
   trackpad.addEventListener('pointerdown', (e) => {
-    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    if (e.pointerType !== 'mouse') return;
+    /* Right / middle button: the daemon protocol already carries `right` and
+       `middle` (BUTTON_INDEX + message-parser), so reuse sendClick() as-is. */
+    if (e.button === 2) {
+      e.preventDefault();
+      sendClick('right');
+      flashTrackpad();
+      return;
+    }
+    if (e.button === 1) {
+      e.preventDefault();
+      sendClick('middle');
+      flashTrackpad();
+      return;
+    }
+    if (e.button !== 0) return;
     e.preventDefault();
     trackpad.setPointerCapture(e.pointerId);
     pointerDragging = true;
@@ -654,7 +672,11 @@ if (trackpad) {
     singleTapCandidate = { x: e.clientX, y: e.clientY, time: performance.now() };
   });
 
+  /* A right-click on the trackpad must not open the browser context menu. */
+  trackpad.addEventListener('contextmenu', (e) => e.preventDefault());
+
   trackpad.addEventListener('pointermove', (e) => {
+    if (document.pointerLockElement === trackpad) return;
     if (!pointerDragging || e.pointerType !== 'mouse' || !pointerLast) return;
     const bounds = trackpad.getBoundingClientRect();
     const dx = (e.clientX - pointerLast.x) / bounds.width;
@@ -680,6 +702,57 @@ if (trackpad) {
   trackpad.addEventListener('pointercancel', () => { pointerDragging = false; pointerLast = null; singleTapCandidate = null; });
 
   trackpad.addEventListener('wheel', (e) => { e.preventDefault(); queueScroll(e.deltaY); }, { passive: false });
+
+  /* ── Desktop: temporary mouse capture (Pointer Lock) ──
+     Without pointer lock the host cursor stops as soon as the real cursor
+     hits the window edge. While captured we consume movementX/movementY, so
+     movement is relative and unbounded. Esc (browser-native) or a second
+     press of the toggle releases it. */
+
+  let pointerLocked = false;
+
+  const setPointerLockState = (active) => {
+    pointerLocked = active;
+    if (!lockBtn) return;
+    lockBtn.classList.toggle('trackpad-tool--active', active);
+    lockBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    lockBtn.textContent = active ? 'Release pointer (Esc)' : 'Capture pointer';
+  };
+
+  const togglePointerLock = () => {
+    if (document.pointerLockElement === trackpad) {
+      document.exitPointerLock();
+      return;
+    }
+    const request = trackpad.requestPointerLock();
+    /* Chrome >= 113 returns a promise; swallow the rejection so an
+       unsupported/denied lock never throws into the console. */
+    if (request && typeof request.catch === 'function') request.catch(() => {});
+  };
+
+  lockBtn?.addEventListener('click', (e) => { e.preventDefault(); togglePointerLock(); });
+
+  document.addEventListener('pointerlockchange', () => {
+    setPointerLockState(document.pointerLockElement === trackpad);
+  });
+
+  document.addEventListener('pointerlockerror', () => setPointerLockState(false));
+
+  trackpad.addEventListener('mousemove', (e) => {
+    if (document.pointerLockElement !== trackpad) return;
+    const bounds = trackpad.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const dx = e.movementX / bounds.width;
+    const dy = e.movementY / bounds.height;
+    if (!dx && !dy) return;
+    lastPointerNorm.x = Math.min(1, Math.max(0, lastPointerNorm.x + dx * mouseDeltaSensitivity));
+    lastPointerNorm.y = Math.min(1, Math.max(0, lastPointerNorm.y + dy * mouseDeltaSensitivity));
+    queueMouseDelta(dx, dy);
+  });
+
+  /* Desktop fallback buttons — usable without the pointer-lock capture. */
+  rightClickBtn?.addEventListener('click', (e) => { e.preventDefault(); sendClick('right'); flashTrackpad(); });
+  middleClickBtn?.addEventListener('click', (e) => { e.preventDefault(); sendClick('middle'); flashTrackpad(); });
 }
 
 /* ── Control buttons ── */

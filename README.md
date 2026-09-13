@@ -19,6 +19,38 @@
 
 ---
 
+> ⚠️ **Unofficial personal fork / 个人自用魔改版** — not affiliated with, endorsed by, or merged
+> into upstream, and no support is provided. See *Personal fork / 个人自用魔改版* below.
+
+## Personal fork / 个人自用魔改版
+
+**English.** This is my personal, unofficial fork of
+[`creationsofm7/localtv-remote`](https://github.com/creationsofm7/localtv-remote). Its only purpose is to make
+the controller page work well in a **desktop browser** (a Windows PC driven from a browser tab instead of a
+phone). It is **not** submitted upstream, **will not** be opened as a pull request, and is **not** merged
+with or endorsed by the upstream project. No support, no release cadence, no promise of tracking upstream.
+If you want the supported product, use upstream.
+
+**中文。** 这是我个人自用的非官方魔改版，fork 自
+[`creationsofm7/localtv-remote`](https://github.com/creationsofm7/localtv-remote)。唯一目的是让控制器网页在
+**桌面浏览器**上好用（用电脑浏览器当遥控器，而不是手机）。**不会**向上游提 PR，**不**与上游合并，也不代表
+上游立场；不提供任何支持、不保证与上游同步。需要受支持的产品请用上游版本。
+
+### Differences from upstream / 与上游的差异
+
+| Change | 说明 |
+| --- | --- |
+| **Pointer capture (Pointer Lock)** — a *Capture pointer* toggle sits under the trackpad; while captured the host cursor moves by `movementX`/`movementY`, so it no longer stops at the browser window edge. Esc or a second press releases it, and `pointerlockchange` keeps the button state in sync. | **指针捕获**：触控板下方新增「Capture pointer」开关，捕获期间用 `movementX/movementY` 做相对位移，不再受窗口边界限制；Esc 或再按一次退出，按钮状态随 `pointerlockchange` 同步。 |
+| **Right click** — `contextmenu` is suppressed on the trackpad and `pointerdown` with `e.button === 2` sends the existing `right` click; a *Right click* button is provided as a fallback. | **右键**：触控板内屏蔽 `contextmenu`，`e.button === 2` 复用既有 `right` 点击协议；另加「Right click」兜底按钮。 |
+| **Middle click** — `e.button === 1` sends the existing `middle` click (the daemon protocol already carries `middle`); a *Middle click* button is provided as a fallback. | **中键**：`e.button === 1` 复用既有 `middle` 点击协议（协议本就支持 `middle`）；另加「Middle click」兜底按钮。 |
+| **Untouched** — the phone/touch gestures (two-finger tap = right click, two-finger scroll), the Windows input layer, and the server. The new desktop tool row is hidden on coarse-pointer devices. | **未改动**：手机/触摸手势（双指轻点=右键、双指滚动）、Windows 输入层与服务端；新增的桌面按钮行在触摸设备上隐藏。 |
+
+Files touched / 改动文件: `public/control/controller.js`, `public/control/index.html`,
+`public/control/controller.css`.
+
+Upstream code stays under Apache-2.0 with its original copyright notice (see [LICENSE](LICENSE),
+Copyright 2026 Mudit Pandey). Modifications in this fork are distributed under the same license.
+
 # Control your Windows PC from your phone — LocalTV Remote
 
 **LocalTV Remote** is a **free, open-source** app that turns your phone into a **wireless mouse, keyboard, and volume remote** for any **Windows 10/11 PC or laptop** — over your local Wi-Fi.

@@ -124,6 +124,20 @@
               <div class="trackpad" id="trackpad">
                 <span class="trackpad__hint">Swipe to move cursor</span>
               </div>
+              <!-- Desktop-only tools: pointer capture + right/middle click.
+                   Hidden on touch devices (they keep the gesture paths). -->
+              <div class="trackpad-tools" id="trackpad-tools">
+                <button class="trackpad-tool trackpad-tool--lock" id="btn-lock" type="button"
+                        aria-pressed="false" title="Capture the mouse pointer for relative movement (Esc to release)">
+                  Capture pointer
+                </button>
+                <button class="trackpad-tool" id="btn-right-click" type="button" title="Send a right click">
+                  Right click
+                </button>
+                <button class="trackpad-tool" id="btn-middle-click" type="button" title="Send a middle click">
+                  Middle click
+                </button>
+              </div>
             </div>
             <div class="ctrl-row">
               <button class="ctrl-btn" id="btn-back" type="button" aria-label="Back">
